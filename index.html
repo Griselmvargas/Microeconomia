@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>Interactividad de Elasticidad de la Demanda</title>
+  <!-- Incluir Plotly desde CDN -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -17,9 +19,9 @@
     input[type="range"] {
       width: 300px;
     }
-    #graphCanvas {
-      border: 1px solid #ccc;
-      display: block;
+    #plot {
+      width: 600px;
+      height: 400px;
       margin-bottom: 15px;
     }
     .result, .calc-details {
@@ -33,7 +35,7 @@
 </head>
 <body>
   <h2>Interactividad de Elasticidad de la Demanda</h2>
-  <p>Función de demanda: <em>Q = a - bY</em></p>
+  <p>Función de demanda: Q = a - bY</p>
   
   <!-- Controles -->
   <div class="slider-container">
@@ -54,138 +56,109 @@
     <span id="yVal">20</span>
   </div>
   
-  <!-- Canvas para el gráfico -->
-  <canvas id="graphCanvas" width="600" height="400"></canvas>
+  <!-- Div para la gráfica -->
+  <div id="plot"></div>
   
   <!-- Resultados -->
   <div class="result" id="resultText"></div>
   <div class="calc-details" id="calcDetails"></div>
   
   <script>
-    function updateGraph() {
+    function updatePlot() {
       // Obtener valores de los controles
       var a = parseFloat(document.getElementById("aInput").value);
       var b = parseFloat(document.getElementById("bInput").value);
       var Y = parseFloat(document.getElementById("yInput").value);
-      
-      // Actualizar las etiquetas de los sliders
       document.getElementById("aVal").textContent = a;
       document.getElementById("bVal").textContent = b.toFixed(1);
       document.getElementById("yVal").textContent = Y;
       
-      // Calcular Q con: Q = a - bY
+      // Calcular cantidad: Q = a - bY
       var Q = a - b * Y;
-      
-      // Calcular elasticidad: E = -b * (Y / Q)
+      // Calcular elasticidad: E = -b*(Y/Q)
       var elasticity = (Q === 0) ? NaN : -b * (Y / Q);
       
-      // Configuración de la zona de dibujo
-      var canvas = document.getElementById("graphCanvas");
-      var ctx = canvas.getContext("2d");
-      // Limpiar el canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Definir escalas y offsets:
-      // Eje X: Y de 0 a 500 → canvas.width = 600 → escalaX = 600/500
-      var escalaX = canvas.width / 500; // 600/500 = 1.2
-      // Eje Y: Q de -500 a 500 → 1000 unidades totales → canvas.height = 400 → escalaY = 400/1000
-      var escalaY = canvas.height / 1000; // 0.4
-      // El centro vertical en canvas corresponde a Q = 0:
-      var offsetY = canvas.height / 2;
-      
-      // Dibujar eje de precio (Y)
-      ctx.beginPath();
-      ctx.moveTo(0, offsetY);
-      ctx.lineTo(canvas.width, offsetY);
-      ctx.strokeStyle = "black";
-      ctx.stroke();
-      
-      // Dibujar eje de cantidad (Q)
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0, canvas.height);
-      ctx.strokeStyle = "black";
-      ctx.stroke();
-      
-      // Opcional: Dibujar líneas de la cuadrícula
-      ctx.strokeStyle = "#ccc";
-      // Líneas verticales (cada 50 unidades en Y)
-      for (var yVal = 0; yVal <= 500; yVal += 50) {
-        ctx.beginPath();
-        ctx.moveTo(yVal * escalaX, 0);
-        ctx.lineTo(yVal * escalaX, canvas.height);
-        ctx.stroke();
-      }
-      // Líneas horizontales (cada 100 unidades en Q, desde -500 hasta 500)
-      for (var qVal = -500; qVal <= 500; qVal += 100) {
-        var yCanvas = offsetY - qVal * escalaY;
-        ctx.beginPath();
-        ctx.moveTo(0, yCanvas);
-        ctx.lineTo(canvas.width, yCanvas);
-        ctx.stroke();
+      // Crear puntos para la curva de demanda
+      var numPoints = 100;
+      var Y_vals = [], Q_vals = [];
+      var Y_min = 0, Y_max = 500;
+      for (var i = 0; i <= numPoints; i++) {
+        var currentY = Y_min + i * (Y_max - Y_min) / numPoints;
+        Y_vals.push(currentY);
+        Q_vals.push(a - b * currentY);
       }
       
-      // Dibujar la curva de la demanda para Y de 0 a 500
-      ctx.strokeStyle = "blue";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (var yVal = 0; yVal <= 500; yVal += 1) {
-        var qVal = a - b * yVal;
-        var xC = yVal * escalaX;             // Coordenada en X basada en Y
-        var yC = offsetY - qVal * escalaY;     // Coordenada en Y (invertida)
-        if (yVal === 0) {
-          ctx.moveTo(xC, yC);
-        } else {
-          ctx.lineTo(xC, yC);
-        }
-      }
-      ctx.stroke();
+      var traceCurve = {
+        x: Y_vals,
+        y: Q_vals,
+        mode: 'lines',
+        name: 'Curva de Demanda',
+        line: {color: 'blue'}
+      };
       
-      // Dibujar el punto evaluado (Y, Q)
-      ctx.fillStyle = "red";
-      var ptX = Y * escalaX;
-      var ptY = offsetY - Q * escalaY;
-      ctx.beginPath();
-      ctx.arc(ptX, ptY, 5, 0, 2 * Math.PI);
-      ctx.fill();
+      var tracePoint = {
+        x: [Y],
+        y: [Q],
+        mode: 'markers',
+        name: 'Punto Evaluado',
+        marker: { color: 'red', size: 10 }
+      };
+      
+      var data = [traceCurve, tracePoint];
+      
+      // Layout sin utilizar LaTeX en los ejes (etiquetas en texto plano)
+      var layout = {
+        title: 'Curva de Demanda',
+        xaxis: {
+          title: 'Precio (Y)',
+          range: [0, 500],
+          dtick: 50
+        },
+        yaxis: {
+          title: 'Cantidad (Q)',
+          range: [-500, 500],
+          dtick: 100
+        },
+        margin: { t: 50, b: 50, l: 50, r: 20 }
+      };
+      
+      Plotly.newPlot('plot', data, layout);
       
       // Mostrar resultados de elasticidad
-      var resultText = "<strong>Elasticidad en Y = " + Y.toFixed(2) + ":</strong> ";
+      var resultMessage = "<strong>Elasticidad en Y = " + Y.toFixed(2) + ":</strong> ";
       if (isNaN(elasticity)) {
-        resultText += "No se puede determinar la elasticidad (Q = 0).";
+        resultMessage += "No se puede calcular la elasticidad (Q = 0).";
       } else {
-        resultText += elasticity.toFixed(2) + "<br>";
+        resultMessage += elasticity.toFixed(2) + "<br>";
         if (Math.abs(elasticity) < 1) {
-          resultText += "La demanda es <strong>inelástica</strong> en este punto.";
+          resultMessage += "La demanda es inelástica en este punto.";
         } else if (Math.abs(elasticity) > 1) {
-          resultText += "La demanda es <strong>elástica</strong> en este punto.";
+          resultMessage += "La demanda es elástica en este punto.";
         } else {
-          resultText += "La demanda es <strong>unitaria</strong> en este punto.";
+          resultMessage += "La demanda es unitaria en este punto.";
         }
       }
-      document.getElementById("resultText").innerHTML = resultText;
+      document.getElementById("resultText").innerHTML = resultMessage;
       
       // Mostrar detalles de los cálculos
       var details = "<h3>Detalles del Cálculo</h3>";
-      details += "<p><strong>1.</strong> Función de demanda: Q = a - bY</p>";
-      details += "<p><strong>2.</strong> Valores: a = " + a + ", b = " + b.toFixed(1) + ", Y = " + Y + "</p>";
-      details += "<p><strong>3.</strong> Calculamos Q: Q = " + a + " - (" + b.toFixed(1) + " * " + Y + ") = " + Q.toFixed(2) + "</p>";
+      details += "<p><strong>Función de Demanda:</strong> Q = a - bY</p>";
+      details += "<p><strong>Valores:</strong> a = " + a + ", b = " + b.toFixed(1) + ", Y = " + Y + "</p>";
+      details += "<p><strong>Cálculo de Q:</strong> Q = " + a + " - (" + b.toFixed(1) + " × " + Y + ") = " + Q.toFixed(2) + "</p>";
       if (Q === 0) {
-        details += "<p><strong>4.</strong> Q = 0, por lo que no se puede calcular la elasticidad (división por cero).</p>";
+        details += "<p><strong>Nota:</strong> Q = 0, por lo que no se puede calcular la elasticidad.</p>";
       } else {
-        details += "<p><strong>4.</strong> Elasticidad: E = -b * (Y / Q)</p>";
-        details += "<p>E = -" + b.toFixed(1) + " * (" + Y + " / " + Q.toFixed(2) + ") = " + elasticity.toFixed(2) + "</p>";
+        details += "<p><strong>Cálculo de la Elasticidad:</strong> E = -b × (Y / Q)</p>";
+        details += "<p>E = -" + b.toFixed(1) + " × (" + Y + " / " + Q.toFixed(2) + ") = " + elasticity.toFixed(2) + "</p>";
       }
       document.getElementById("calcDetails").innerHTML = details;
     }
     
-    // Asignar event listeners a los sliders
-    document.getElementById("aInput").addEventListener("input", updateGraph);
-    document.getElementById("bInput").addEventListener("input", updateGraph);
-    document.getElementById("yInput").addEventListener("input", updateGraph);
+    document.getElementById("aInput").addEventListener("input", updatePlot);
+    document.getElementById("bInput").addEventListener("input", updatePlot);
+    document.getElementById("yInput").addEventListener("input", updatePlot);
     
-    // Dibujo inicial
-    updateGraph();
+    updatePlot();
   </script>
 </body>
 </html>
