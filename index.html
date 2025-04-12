@@ -10,14 +10,16 @@
       font-family: Arial, sans-serif;
       margin: 20px;
     }
-    .slider-container {
+    .slider-container, .input-container {
       margin-bottom: 15px;
     }
     label {
       font-weight: bold;
     }
-    input[type="range"] {
+    input[type="range"],
+    input[type="text"] {
       width: 300px;
+      margin-right: 10px;
     }
     #plot {
       width: 600px;
@@ -35,9 +37,16 @@
 </head>
 <body>
   <h2>Interactividad de Elasticidad de la Demanda</h2>
-  <p>Función de demanda: Q = a - bY</p>
+  <p>La función de demanda se expresará en la forma <strong>Q = [ecuación]</strong>. Ingresa la ecuación a continuación (usa \(a\) para el intercepto, \(b\) para la pendiente y \(Y\) para el precio).<br>
+  Ejemplo: <em>a - b*Y</em></p>
   
-  <!-- Controles -->
+  <!-- Cuadro de texto para la ecuación -->
+  <div class="input-container">
+    <label for="eqInput">Ecuación de Demanda:</label>
+    <input type="text" id="eqInput" value="a - b*Y">
+  </div>
+  
+  <!-- Controles para parámetros -->
   <div class="slider-container">
     <label for="aInput">Intercepto (a): </label>
     <input type="range" id="aInput" min="50" max="200" step="5" value="100">
@@ -59,35 +68,53 @@
   <!-- Div para la gráfica -->
   <div id="plot"></div>
   
-  <!-- Resultados -->
+  <!-- Resultados y Detalles -->
   <div class="result" id="resultText"></div>
   <div class="calc-details" id="calcDetails"></div>
   
   <script>
     function updatePlot() {
-      // Obtener valores de los controles
+      // Obtener los valores de los controles
       var a = parseFloat(document.getElementById("aInput").value);
       var b = parseFloat(document.getElementById("bInput").value);
       var Y = parseFloat(document.getElementById("yInput").value);
+      var eqString = document.getElementById("eqInput").value;
+      
+      // Actualizar las etiquetas de los sliders
       document.getElementById("aVal").textContent = a;
       document.getElementById("bVal").textContent = b.toFixed(1);
       document.getElementById("yVal").textContent = Y;
       
-      // Calcular cantidad: Q = a - bY
-      var Q = a - b * Y;
-      // Calcular elasticidad: E = -b*(Y/Q)
-      var elasticity = (Q === 0) ? NaN : -b * (Y / Q);
+      // Evaluar la ecuación de demanda
+      var Q, eqError = "";
+      try {
+        // Se crea una función anónima con variables a, b y Y
+        var demandFunc = new Function("a", "b", "Y", "return " + eqString + ";");
+        Q = demandFunc(a, b, Y);
+      } catch (error) {
+        Q = NaN;
+        eqError = "Error en la ecuación: " + error.message;
+      }
       
-      // Crear puntos para la curva de demanda
+      // Calcular la elasticidad: E = -b * (Y / Q)
+      var elasticity = (Q === 0 || isNaN(Q)) ? NaN : -b * (Y / Q);
+      
+      // Generar puntos para la curva de demanda para Y de 0 a 500
       var numPoints = 100;
       var Y_vals = [], Q_vals = [];
       var Y_min = 0, Y_max = 500;
       for (var i = 0; i <= numPoints; i++) {
         var currentY = Y_min + i * (Y_max - Y_min) / numPoints;
         Y_vals.push(currentY);
-        Q_vals.push(a - b * currentY);
+        // Evaluar la ecuación para cada Y; si hay error, usar NaN
+        try {
+          Q_vals.push(demandFunc(a, b, currentY));
+        } catch (e) {
+          Q_vals.push(NaN);
+        }
       }
       
+      // Definir trazos para la gráfica
       var traceCurve = {
         x: Y_vals,
         y: Q_vals,
@@ -106,7 +133,6 @@
       
       var data = [traceCurve, tracePoint];
       
-      // Layout sin utilizar LaTeX en los ejes (etiquetas en texto plano)
       var layout = {
         title: 'Curva de Demanda',
         xaxis: {
@@ -127,7 +153,7 @@
       // Mostrar resultados de elasticidad
       var resultMessage = "<strong>Elasticidad en Y = " + Y.toFixed(2) + ":</strong> ";
       if (isNaN(elasticity)) {
-        resultMessage += "No se puede calcular la elasticidad (Q = 0).";
+        resultMessage += "No se puede calcular la elasticidad.";
       } else {
         resultMessage += elasticity.toFixed(2) + "<br>";
         if (Math.abs(elasticity) < 1) {
@@ -142,22 +168,30 @@
       
       // Mostrar detalles de los cálculos
       var details = "<h3>Detalles del Cálculo</h3>";
-      details += "<p><strong>Función de Demanda:</strong> Q = a - bY</p>";
+      details += "<p><strong>Función de Demanda ingresada:</strong> Q = " + eqString + "</p>";
       details += "<p><strong>Valores:</strong> a = " + a + ", b = " + b.toFixed(1) + ", Y = " + Y + "</p>";
-      details += "<p><strong>Cálculo de Q:</strong> Q = " + a + " - (" + b.toFixed(1) + " × " + Y + ") = " + Q.toFixed(2) + "</p>";
-      if (Q === 0) {
-        details += "<p><strong>Nota:</strong> Q = 0, por lo que no se puede calcular la elasticidad.</p>";
+      if(eqError) {
+        details += "<p style='color:red;'><strong>Error:</strong> " + eqError + "</p>";
       } else {
-        details += "<p><strong>Cálculo de la Elasticidad:</strong> E = -b × (Y / Q)</p>";
-        details += "<p>E = -" + b.toFixed(1) + " × (" + Y + " / " + Q.toFixed(2) + ") = " + elasticity.toFixed(2) + "</p>";
+        details += "<p><strong>Cálculo de Q:</strong> Q = " + eqString + " = " + Q.toFixed(2) + "</p>";
+        if (isNaN(Q) || Q === 0) {
+          details += "<p><strong>Nota:</strong> Q es " + (isNaN(Q) ? "NaN" : "0") + ", no se puede calcular la elasticidad.</p>";
+        } else {
+          details += "<p><strong>Cálculo de la Elasticidad:</strong> E = -b × (Y / Q)</p>";
+          details += "<p>E = -" + b.toFixed(1) + " × (" + Y + " / " + Q.toFixed(2) + ") = " + elasticity.toFixed(2) + "</p>";
+        }
       }
+      
       document.getElementById("calcDetails").innerHTML = details;
     }
     
+    // Asignar event listeners a los controles y al cuadro de texto de ecuación
     document.getElementById("aInput").addEventListener("input", updatePlot);
     document.getElementById("bInput").addEventListener("input", updatePlot);
     document.getElementById("yInput").addEventListener("input", updatePlot);
+    document.getElementById("eqInput").addEventListener("input", updatePlot);
     
+    // Actualizar inicialmente
     updatePlot();
   </script>
 </body>
